@@ -23,6 +23,7 @@ if (!telegramToken || !geminiApiKey) {
 const app = express();
 // For production, we don't use polling. We'll set a webhook instead.
 const bot = new TelegramBot(telegramToken, { polling: !isProduction });
+const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
 // In-memory storage to remember which level each user has selected for Telegram.
 const userState = {};
@@ -53,11 +54,27 @@ async function getSimplifiedText(text, level) {
   }
 }
 
-// 5. EXPRESS SERVER SETUP (for Web App)
+// 5. EXPRESS SERVER SETUP
 
 // Middleware
 app.use(cors()); // Enable Cross-Origin Resource Sharing
 app.use(express.json()); // To parse JSON request bodies
+
+// API Endpoint for the web app
+app.post('/api/simplify', async (req, res) => {
+  const { text, level } = req.body;
+
+  if (!text || !level) {
+    return res.status(400).json({ error: 'Missing text or level in request.' });
+  }
+
+  try {
+    const simplifiedText = await getSimplifiedText(text, level);
+    res.json({ simplifiedText });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // 6. TELEGRAM BOT WEBHOOK (for Production)
 if (isProduction) {
@@ -78,30 +95,26 @@ if (isProduction) {
     }).catch(console.error);
 }
 
-// 7. API ENDPOINTS and STATIC FILE SERVING
+// 7. STATIC FILE SERVING
+// In production (like on Render), serve the built frontend assets from the 'dist' folder.
+// This assumes you have a build step (e.g., 'npm run build') that generates this folder.
+if (isProduction) {
+    const buildPath = path.join(__dirname, 'dist');
+    app.use(express.static(buildPath));
 
-app.use(express.static(path.join(__dirname, '.'))); // Serve static files (index.html, etc.)
-
-// API Endpoint for the web app
-app.post('/api/simplify', async (req, res) => {
-  const { text, level } = req.body;
-
-  if (!text || !level) {
-    return res.status(400).json({ error: 'Missing text or level in request.' });
-  }
-
-  try {
-    const simplifiedText = await getSimplifiedText(text, level);
-    res.json({ simplifiedText });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Serve the main index.html for any other GET requests to support client-side routing
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+    // For any request that doesn't match a static file or API route, send index.html.
+    // This is essential for single-page applications like React.
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(buildPath, 'index.html'));
+    });
+} else {
+    // For local development, this serves from the root. This setup relies on a
+    // dev server (like Vite) to handle transpilation of TSX files in real-time.
+    app.use(express.static(path.join(__dirname, '.')));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(__dirname, 'index.html'));
+    });
+}
 
 
 // 8. TELEGRAM BOT LOGIC (Handlers are the same)
