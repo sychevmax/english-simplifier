@@ -26,9 +26,8 @@
     "express": "^4.19.2",
     "node-telegram-bot-api": "^0.66.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
+    "react-dom": "^18.2.0",
     "esbuild": "^0.18.18"
-  }
+  },
+  "devDependencies": {}
 }
