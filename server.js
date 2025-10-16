@@ -7,6 +7,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const { GoogleGenAI } = require('@google/genai');
+const fs = require('fs'); // <-- added
 
 // 2. CONFIGURATION: Get API keys from environment variables (.env file)
 const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -100,13 +101,31 @@ if (isProduction) {
 // This assumes you have a build step (e.g., 'npm run build') that generates this folder.
 if (isProduction) {
     const buildPath = path.join(__dirname, 'dist');
-    app.use(express.static(buildPath));
+    const indexPath = path.join(buildPath, 'index.html');
 
-    // For any request that doesn't match a static file or API route, send index.html.
-    // This is essential for single-page applications like React.
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(buildPath, 'index.html'));
-    });
+    if (fs.existsSync(indexPath)) {
+        app.use(express.static(buildPath));
+        // For any request that doesn't match a static file or API route, send index.html.
+        app.get('*', (req, res) => {
+            res.sendFile(indexPath);
+        });
+    } else {
+        // If the built frontend is missing, avoid crashing with ENOENT and provide a clear message.
+        console.warn('Warning: Built frontend not found at /dist/index.html. Make sure you run "npm run build" during the Render build step.');
+        const fallbackIndex = path.join(__dirname, 'index.html');
+        if (fs.existsSync(fallbackIndex)) {
+            // Fall back to serving the repo root index.html (useful for local dev-like deployments)
+            app.use(express.static(__dirname));
+            app.get('*', (req, res) => {
+                res.sendFile(fallbackIndex);
+            });
+        } else {
+            // No frontend found — return a helpful 500 message for all unknown routes
+            app.get('*', (req, res) => {
+                res.status(500).send('No built frontend found. Run "npm run build" to create the /dist folder before starting the server.');
+            });
+        }
+    }
 } else {
     // For local development, this serves from the root. This setup relies on a
     // dev server (like Vite) to handle transpilation of TSX files in real-time.
