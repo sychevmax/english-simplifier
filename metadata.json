@@ -1,0 +1,5 @@
+{
+  "name": "English Text Simplifier Bot",
+  "description": "A web application that simplifies English text to different CEFR language levels (A1, A2, B1, B2) using the Gemini API, mimicking the functionality of a Telegram bot.",
+  "requestFramePermissions": []
+}
